@@ -1,0 +1,3 @@
+# Install only if you're using ElasticConnector (connectors/elastic.py):
+#   pip install -r requirements.txt -r connectors/requirements-elastic.txt
+elasticsearch>=8,<9
