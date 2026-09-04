@@ -50,18 +50,26 @@ async def test_get_nonexistent_alert_404(client):
 
 
 @pytest.mark.asyncio
-async def test_analyze_returns_501_for_existing_alert(client):
+async def test_analyze_with_no_ai_provider_returns_rule_based_score_only(client):
+    """Default test settings have AI_PROVIDER=none, so /analyze should
+    return the rule-based risk score (computed automatically on ingest)
+    without attempting any AI call."""
     resp = await client.post(
         "/api/v1/alerts",
         json={
             "timestamp": "2026-08-26T10:31:19Z",
             "source": "src-analyze",
             "source_product": "generic_webhook",
+            "severity": "high",
         },
     )
     alert_id = resp.json()["alert_id"]
     resp2 = await client.post(f"/api/v1/alerts/{alert_id}/analyze")
-    assert resp2.status_code == 501
+    assert resp2.status_code == 200
+    body = resp2.json()
+    assert body["ai_analysis"] is None
+    assert body["risk_score"] is not None
+    assert body["risk_score_breakdown"] is not None
 
 
 @pytest.mark.asyncio
