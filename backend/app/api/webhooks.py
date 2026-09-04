@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import Connector as ConnectorModel
 from app.db.session import get_db
 from app.services.ingestion import ingest_alert
+from app.services.pipeline import process_new_alert
 from connectors.generic import GenericWebhookConnector
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
@@ -70,5 +71,6 @@ async def receive_webhook_alert(
 
     normalized = connector.normalize_event(raw)
     db_alert = await ingest_alert(db, normalized, connector_id=connector_row.id)
+    db_alert = await process_new_alert(db, db_alert)
 
-    return {"alert_id": db_alert.alert_id, "status": "ingested"}
+    return {"alert_id": db_alert.alert_id, "status": "ingested", "risk_score": db_alert.risk_score}

@@ -70,6 +70,17 @@ class Alert(Base):
     # --- DetectAI-internal state -------------------------------------------------
     status: Mapped[str] = mapped_column(String(32), default="new")
     dedup_group_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True, index=True)
+    # Exact-match signature computed from entity keys + rule_id (Phase 11).
+    # Two alerts sharing a signature within the correlation window are
+    # treated as duplicates of the same underlying event.
+    dedup_signature: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+
+    # Rule-based risk score (Phase 12) — computed independent of any LLM,
+    # so the pipeline is fully functional with AI_PROVIDER=none. breakdown
+    # is the transparent "why this score" explanation shown to analysts.
+    risk_score: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    risk_score_breakdown: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON, nullable=True)
+    investigation_priority: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
 
     incident_id: Mapped[Optional[str]] = mapped_column(
         String(36), ForeignKey("incidents.id"), nullable=True, index=True
