@@ -10,18 +10,6 @@ It is not an autonomous SOC, not a chatbot wrapper, and not tied to a single SIE
 
 SOC analysts drown in alerts — duplicates, low-context detections, and inconsistent triage make investigation slow and error-prone. Most "AI SOC" tools either auto-close alerts with an untrustworthy black-box score, or wrap a chatbot around raw logs and hallucinate. DetectAI's approach: keep every AI conclusion evidence-backed and validated, run a fully functional rule-based pipeline even with no LLM configured, and never assign a MITRE technique or risk score without a cited reason.
 
-## Status
-
-Early development. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full design and phased build plan.
-
-| Phase | Status |
-|---|---|
-| 0 — Architecture & planning | ✅ Done |
-| 2 — Common Alert Schema | ✅ Done |
-| 3 — FastAPI backend skeleton | ✅ Done |
-| 4 — PostgreSQL models + migrations | ✅ Done |
-| 5+ — Connectors, correlation, AI layer, dashboard | 🔧 In progress |
-
 ## Architecture (high level)
 
 ```
@@ -31,43 +19,83 @@ SIEM/EDR/Cloud → Connector → Normalization → Dedup → Correlation
    → Risk Scoring → PostgreSQL → FastAPI → React SOC Dashboard → Analyst Feedback
 ```
 
-Full diagram and rationale in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+Full diagram and rationale in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). API reference in [`docs/API.md`](docs/API.md). Adding a new SIEM connector: [`docs/CONNECTOR_GUIDE.md`](docs/CONNECTOR_GUIDE.md).
 
 ## Tech stack
 
-- **Backend**: FastAPI (Python), SQLAlchemy (async), PostgreSQL, Alembic, Redis
+- **Backend**: FastAPI (Python), SQLAlchemy (async), PostgreSQL, Alembic, Redis, JWT auth (RBAC: viewer/analyst/admin)
 - **AI**: provider-agnostic (`LLMProvider` abstraction) — OpenAI-compatible, Anthropic-compatible, or local Ollama; fully functional with AI disabled
-- **Frontend**: React + Vite (planned, Phase 16)
+- **Frontend**: React + Vite + TypeScript
 - **Deployment**: Docker Compose
 
-## Getting started
+## Getting started (Docker — recommended)
+
+```bash
+cp .env.example .env
+# edit .env — at minimum, set a real SECRET_KEY:
+# python -c "import secrets; print(secrets.token_hex(32))"
+
+docker compose up -d
+# add --profile ollama to also start a local Ollama instance
+
+# bootstrap the first admin user (public registration only grants "viewer")
+docker compose exec backend python scripts/create_admin.py admin your-password
+```
+
+- Dashboard: http://localhost:8080
+- API docs: http://localhost:8000/docs
+
+**Honest note**: the Dockerfiles and compose file were written carefully but not build-verified in the environment that produced this repo (no Docker daemon available there). Test the build yourself before relying on it for anything important, and open an issue if something doesn't work as documented.
+
+## Getting started (without Docker)
 
 ```bash
 cd backend
 pip install -r requirements.txt
 cp .env.example .env
-# edit .env — leave AI_PROVIDER=none to run without any LLM configured
+# leave AI_PROVIDER=none to run without any LLM configured
+# leave DATABASE_URL pointed at sqlite for a quick local run, or a real Postgres
 
 alembic upgrade head
+python scripts/create_admin.py admin your-password
 uvicorn app.main:app --reload --port 8000
-# API docs: http://localhost:8000/docs
+```
+
+```bash
+cd frontend
+npm install
+cp .env.example .env.local
+npm run dev
 ```
 
 Run tests:
 
 ```bash
-pytest tests/ -v
+cd backend && pytest tests/ -v            # 275+ tests
+cd frontend && npm run build && npm run lint
 ```
+
+Run the synthetic-scenario benchmark (architecture doc §24):
+
+```bash
+cd backend && python scripts/run_benchmark.py
+```
+
+See [`docs/sample_benchmark_output.txt`](docs/sample_benchmark_output.txt) for a sample run. Note: the AI-assisted figures in that benchmark use a scripted fake provider, not a real LLM (none was available to test against) — re-run with a real `AI_PROVIDER` configured for numbers that reflect actual model behavior.
 
 ## Project structure
 
 ```
 detect-ai/
-├── backend/        # FastAPI app, DB models, migrations
-├── connectors/      # SIEM/EDR connector plugins (Phase 5+)
-├── frontend/         # React SOC dashboard (Phase 16)
-├── docs/              # Architecture, API, connector guide
-└── docker-compose.yml # Full stack deployment (Phase 25)
+├── backend/         # FastAPI app, DB models, migrations, connectors, AI layer
+│   ├── connectors/    # SIEM/EDR connector plugins (Elastic, Splunk, Wazuh, generic)
+│   ├── datasets/       # Synthetic attack scenario generators
+│   ├── scripts/         # Admin bootstrap, benchmark runner
+│   └── tests/            # 275+ tests
+├── frontend/         # React SOC dashboard
+├── docs/               # Architecture, API reference, connector guide
+├── docker-compose.yml   # Full stack deployment
+└── .env.example
 ```
 
 ## License
