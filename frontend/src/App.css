@@ -1,0 +1,32 @@
+.app-shell {
+  min-height: 100vh;
+  background: #f8fafc;
+}
+
+.app-header {
+  background: #0f172a;
+  color: #fff;
+  padding: 14px 24px;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.app-title {
+  color: #fff;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 1.1rem;
+  letter-spacing: -0.01em;
+}
+
+.app-subtitle {
+  color: #94a3b8;
+  font-size: 0.85rem;
+}
+
+.app-main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px;
+}
