@@ -11,7 +11,7 @@ Docs once running:
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import alerts, health, webhooks
+from app.api import alerts, health, mitre, webhooks
 from app.core.config import get_settings
 from app.core.logging_config import configure_logging
 
@@ -37,6 +37,7 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(alerts.router, prefix=settings.api_v1_prefix)
 app.include_router(webhooks.router, prefix=settings.api_v1_prefix)
+app.include_router(mitre.router, prefix=settings.api_v1_prefix)
 
 
 @app.get("/")
