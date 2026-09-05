@@ -167,6 +167,14 @@ class CommonAlertSchema(BaseModel):
     dedup_group_id: Optional[str] = None
     incident_id: Optional[str] = None
 
+    # Rule-based risk output (Phase 12) — always populated after the
+    # ingestion pipeline runs, None only for an alert that hasn't been
+    # processed yet. AI-driven risk assessment is a separate resource
+    # (GET/POST .../analyze), not part of this wire format.
+    risk_score: Optional[int] = None
+    risk_score_breakdown: Optional[dict[str, Any]] = None
+    investigation_priority: Optional[str] = None
+
     model_config = ConfigDict(
         use_enum_values=True,
         json_schema_extra={

@@ -89,3 +89,23 @@ async def test_duplicate_external_alert_id_returns_same_alert(client):
     resp1 = await client.post("/api/v1/alerts", json=payload)
     resp2 = await client.post("/api/v1/alerts", json=payload)
     assert resp1.json()["alert_id"] == resp2.json()["alert_id"]
+
+
+@pytest.mark.asyncio
+async def test_created_alert_response_includes_risk_score(client):
+    """Regression test: risk_score/investigation_priority must be present
+    in the API response, not just in the DB — this was a real gap caught
+    while building the frontend (Phase 16)."""
+    resp = await client.post(
+        "/api/v1/alerts",
+        json={
+            "timestamp": "2026-08-26T10:31:19Z",
+            "source": "risk-visibility-test",
+            "source_product": "generic_webhook",
+            "severity": "critical",
+        },
+    )
+    body = resp.json()
+    assert body["risk_score"] is not None
+    assert body["risk_score_breakdown"] is not None
+    assert body["investigation_priority"] is not None

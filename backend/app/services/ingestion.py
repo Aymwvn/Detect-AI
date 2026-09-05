@@ -123,6 +123,9 @@ def alert_model_to_schema(db_alert: Alert) -> CommonAlertSchema:
         status=db_alert.status,
         dedup_group_id=db_alert.dedup_group_id,
         incident_id=db_alert.incident_id,
+        risk_score=db_alert.risk_score,
+        risk_score_breakdown=db_alert.risk_score_breakdown,
+        investigation_priority=db_alert.investigation_priority,
     )
 
 

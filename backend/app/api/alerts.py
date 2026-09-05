@@ -15,10 +15,12 @@ ingestion path.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
+from app.db.models import AnalystFeedback, AuditLog
 from app.db.models import Alert as AlertModel
 from app.db.session import get_db
 from app.schemas import CommonAlertSchema
@@ -27,6 +29,14 @@ from app.services.ai.exceptions import LLMProviderError
 from app.services.ai.factory import get_llm_provider
 from app.services.ingestion import alert_model_to_schema, ingest_alert
 from app.services.pipeline import process_new_alert
+
+ALLOWED_FEEDBACK_LABELS = {
+    "true_positive",
+    "false_positive",
+    "benign",
+    "needs_investigation",
+    "confirmed_incident",
+}
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
 
@@ -104,13 +114,81 @@ async def analyze_alert(alert_id: str, db: AsyncSession = Depends(get_db)) -> di
     }
 
 
-@router.post("/{alert_id}/feedback")
-async def submit_feedback(alert_id: str, db: AsyncSession = Depends(get_db)) -> dict:
-    """Analyst TP/FP/benign labeling. Wired up in Phase 17."""
+class FeedbackSubmission(BaseModel):
+    analyst_id: str
+    label: str = Field(description=f"One of: {', '.join(sorted(ALLOWED_FEEDBACK_LABELS))}")
+    comment: str | None = None
+
+
+@router.post("/{alert_id}/feedback", status_code=status.HTTP_201_CREATED)
+async def submit_feedback(
+    alert_id: str, submission: FeedbackSubmission, db: AsyncSession = Depends(get_db)
+) -> dict:
+    """Analyst TP/FP/benign labeling (architecture doc section 12).
+    Stored for future evaluation/fine-tuning pipelines — NEVER used to
+    automatically retrain or adjust anything in this codebase. An audit
+    log entry is written alongside every submission so feedback history
+    is independently verifiable, not just trusted from the feedback table
+    itself."""
+    if submission.label not in ALLOWED_FEEDBACK_LABELS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"label must be one of: {', '.join(sorted(ALLOWED_FEEDBACK_LABELS))}",
+        )
+
     result = await db.execute(select(AlertModel).where(AlertModel.alert_id == alert_id))
     if result.scalar_one_or_none() is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found")
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Feedback loop not yet implemented (Phase 17).",
+
+    feedback = AnalystFeedback(
+        alert_id=alert_id,
+        analyst_id=submission.analyst_id,
+        label=submission.label,
+        comment=submission.comment,
     )
+    db.add(feedback)
+
+    db.add(
+        AuditLog(
+            actor=submission.analyst_id,
+            action="feedback_submitted",
+            object_type="alert",
+            object_id=alert_id,
+            details={"label": submission.label},
+        )
+    )
+
+    await db.commit()
+    await db.refresh(feedback)
+
+    return {
+        "feedback_id": feedback.id,
+        "alert_id": alert_id,
+        "label": feedback.label,
+        "created_at": feedback.created_at.isoformat(),
+    }
+
+
+@router.get("/{alert_id}/feedback")
+async def list_feedback(alert_id: str, db: AsyncSession = Depends(get_db)) -> list[dict]:
+    """Feedback history for an alert — shown on the Investigation page so
+    an analyst can see prior labels before adding their own."""
+    result = await db.execute(select(AlertModel).where(AlertModel.alert_id == alert_id))
+    if result.scalar_one_or_none() is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found")
+
+    result = await db.execute(
+        select(AnalystFeedback)
+        .where(AnalystFeedback.alert_id == alert_id)
+        .order_by(AnalystFeedback.created_at.desc())
+    )
+    return [
+        {
+            "feedback_id": f.id,
+            "analyst_id": f.analyst_id,
+            "label": f.label,
+            "comment": f.comment,
+            "created_at": f.created_at.isoformat(),
+        }
+        for f in result.scalars().all()
+    ]
