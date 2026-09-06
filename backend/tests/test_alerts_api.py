@@ -50,7 +50,7 @@ async def test_get_nonexistent_alert_404(client):
 
 
 @pytest.mark.asyncio
-async def test_analyze_with_no_ai_provider_returns_rule_based_score_only(client):
+async def test_analyze_with_no_ai_provider_returns_rule_based_score_only(client, auth_headers):
     """Default test settings have AI_PROVIDER=none, so /analyze should
     return the rule-based risk score (computed automatically on ingest)
     without attempting any AI call."""
@@ -64,7 +64,8 @@ async def test_analyze_with_no_ai_provider_returns_rule_based_score_only(client)
         },
     )
     alert_id = resp.json()["alert_id"]
-    resp2 = await client.post(f"/api/v1/alerts/{alert_id}/analyze")
+    headers = await auth_headers("analyst")
+    resp2 = await client.post(f"/api/v1/alerts/{alert_id}/analyze", headers=headers)
     assert resp2.status_code == 200
     body = resp2.json()
     assert body["ai_analysis"] is None
@@ -73,9 +74,35 @@ async def test_analyze_with_no_ai_provider_returns_rule_based_score_only(client)
 
 
 @pytest.mark.asyncio
-async def test_analyze_404_for_nonexistent_alert(client):
-    resp = await client.post("/api/v1/alerts/does-not-exist/analyze")
+async def test_analyze_404_for_nonexistent_alert(client, auth_headers):
+    headers = await auth_headers("analyst")
+    resp = await client.post("/api/v1/alerts/does-not-exist/analyze", headers=headers)
     assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_analyze_requires_authentication(client):
+    resp = await client.post(
+        "/api/v1/alerts",
+        json={"timestamp": "2026-08-26T10:31:19Z", "source": "s", "source_product": "generic_webhook"},
+    )
+    alert_id = resp.json()["alert_id"]
+    resp2 = await client.post(f"/api/v1/alerts/{alert_id}/analyze")
+    assert resp2.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_analyze_rejects_viewer_role(client, auth_headers):
+    """A viewer (read-only role) must not be able to trigger analysis —
+    only analyst/admin."""
+    resp = await client.post(
+        "/api/v1/alerts",
+        json={"timestamp": "2026-08-26T10:31:19Z", "source": "s", "source_product": "generic_webhook"},
+    )
+    alert_id = resp.json()["alert_id"]
+    headers = await auth_headers("viewer")
+    resp2 = await client.post(f"/api/v1/alerts/{alert_id}/analyze", headers=headers)
+    assert resp2.status_code == 403
 
 
 @pytest.mark.asyncio

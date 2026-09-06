@@ -20,6 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
+from app.core.deps import CurrentUser, require_role
 from app.db.models import AnalystFeedback, AuditLog
 from app.db.models import Alert as AlertModel
 from app.db.session import get_db
@@ -70,7 +71,11 @@ async def get_alert(alert_id: str, db: AsyncSession = Depends(get_db)) -> Common
 
 
 @router.post("/{alert_id}/analyze")
-async def analyze_alert(alert_id: str, db: AsyncSession = Depends(get_db)) -> dict:
+async def analyze_alert(
+    alert_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: CurrentUser = Depends(require_role("analyst", "admin")),
+) -> dict:
     """Triggers AI analysis on demand — deliberately not run automatically
     on ingest (see app/services/pipeline.py), keeping the LLM call out of
     the hot ingestion path. Always returns the rule-based risk score at
@@ -122,7 +127,10 @@ class FeedbackSubmission(BaseModel):
 
 @router.post("/{alert_id}/feedback", status_code=status.HTTP_201_CREATED)
 async def submit_feedback(
-    alert_id: str, submission: FeedbackSubmission, db: AsyncSession = Depends(get_db)
+    alert_id: str,
+    submission: FeedbackSubmission,
+    db: AsyncSession = Depends(get_db),
+    current_user: CurrentUser = Depends(require_role("analyst", "admin")),
 ) -> dict:
     """Analyst TP/FP/benign labeling (architecture doc section 12).
     Stored for future evaluation/fine-tuning pipelines — NEVER used to

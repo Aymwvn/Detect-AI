@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.deps import CurrentUser, require_role
 from app.db.models import AIAnalysis
 from app.db.models import Alert as AlertModel
 from app.db.models import MitreTechnique
@@ -46,7 +47,10 @@ async def get_technique(technique_id: str, db: AsyncSession = Depends(get_db)) -
 
 
 @router.post("/sync")
-async def trigger_sync(db: AsyncSession = Depends(get_db)) -> dict:
+async def trigger_sync(
+    db: AsyncSession = Depends(get_db),
+    current_user: CurrentUser = Depends(require_role("admin")),
+) -> dict:
     """Fetches the latest official MITRE ATT&CK data and upserts it into
     the local reference table. Safe to call repeatedly (idempotent
     upsert) — intended to be run periodically (e.g. a scheduled job), not

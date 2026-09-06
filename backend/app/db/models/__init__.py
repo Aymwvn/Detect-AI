@@ -13,6 +13,7 @@ from app.db.models.event import Event
 from app.db.models.feedback import AnalystFeedback
 from app.db.models.incident import Incident
 from app.db.models.mitre import MitreTechnique
+from app.db.models.user import User
 
 __all__ = [
     "Base",
@@ -25,4 +26,5 @@ __all__ = [
     "AnalystFeedback",
     "AuditLog",
     "Connector",
+    "User",
 ]

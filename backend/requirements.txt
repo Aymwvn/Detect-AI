@@ -7,6 +7,8 @@ asyncpg>=0.29,<1.0
 alembic>=1.13,<2.0
 redis>=5.0,<6.0
 httpx>=0.27,<1.0   # used by SplunkConnector at runtime, and by tests
+pyjwt>=2.7,<3.0
+bcrypt>=4.0,<5.0
 
 # dev/test
 pytest>=8.0,<9.0

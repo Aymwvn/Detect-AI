@@ -69,3 +69,16 @@ async def test_alert_mitre_mapping_endpoint(client, db_session):
 async def test_alert_mitre_mapping_nonexistent_alert_404(client):
     resp = await client.get("/api/v1/mitre/alerts/does-not-exist/mapping")
     assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_sync_requires_authentication(client):
+    resp = await client.post("/api/v1/mitre/sync")
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_sync_rejects_non_admin_role(client, auth_headers):
+    headers = await auth_headers("analyst")
+    resp = await client.post("/api/v1/mitre/sync", headers=headers)
+    assert resp.status_code == 403
