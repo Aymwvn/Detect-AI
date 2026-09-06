@@ -1,0 +1,53 @@
+======================================================================
+DetectAI Benchmark: Rule-Based-Only vs AI-Assisted (synthetic data)
+======================================================================
+
+Scenario: powershell_execution_chain
+  Alerts generated:       4
+  Dedup groups:           2
+  Correlated incidents:   1
+  Rule-based risk scores: [40, 78, 71, 100]
+  AI classification:      likely_malicious (evidence items: 1)
+
+Scenario: brute_force_authentication
+  Alerts generated:       6
+  Dedup groups:           1
+  Correlated incidents:   1
+  Rule-based risk scores: [20, 23, 26, 29, 32, 90]
+  AI classification:      likely_malicious (evidence items: 0)
+
+Scenario: suspicious_dns_c2_beacon
+  Alerts generated:       4
+  Dedup groups:           1
+  Correlated incidents:   1
+  Rule-based risk scores: [40, 43, 46, 49]
+  AI classification:      likely_malicious (evidence items: 1)
+
+Scenario: credential_access_lsass_dump
+  Alerts generated:       1
+  Dedup groups:           1
+  Correlated incidents:   0
+  Rule-based risk scores: [95]
+  AI classification:      likely_malicious (evidence items: 1)
+
+Scenario: lateral_movement_admin_login
+  Alerts generated:       3
+  Dedup groups:           3
+  Correlated incidents:   1
+  Rule-based risk scores: [87, 90, 90]
+  AI classification:      likely_malicious (evidence items: 1)
+
+----------------------------------------------------------------------
+Summary across all scenarios
+----------------------------------------------------------------------
+Total synthetic alerts:              18
+Total dedup groups:                  8
+Dedup rate:                          55.6%
+Total distinct incidents formed:     3
+Mean rule-based risk score:          58.3
+Total vendor-supplied MITRE mappings: 7
+Mean AI-assisted evidence items/alert (fake provider): 0.8
+
+NOTE: AI-assisted figures use a scripted fake provider, not a real
+LLM. Re-run with AI_PROVIDER=ollama/openai/anthropic configured for
+numbers that reflect actual model behavior.
