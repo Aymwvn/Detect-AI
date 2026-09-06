@@ -10,19 +10,6 @@ It is not an autonomous SOC, not a chatbot wrapper, and not tied to a single SIE
 
 SOC analysts drown in alerts — duplicates, low-context detections, and inconsistent triage make investigation slow and error-prone. Most "AI SOC" tools either auto-close alerts with an untrustworthy black-box score, or wrap a chatbot around raw logs and hallucinate. DetectAI's approach: keep every AI conclusion evidence-backed and validated, run a fully functional rule-based pipeline even with no LLM configured, and never assign a MITRE technique or risk score without a cited reason.
 
-## Status
-
-Feature-complete for MVP scope. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full design and phased build plan.
-
-| Milestone | Status |
-|---|---|
-| M1 — Foundation (schema, API skeleton, database) | ✅ Done |
-| M2 — Ingestion (4 connectors: Elastic, Splunk, Wazuh, generic webhook/REST) | ✅ Done |
-| M3 — Correlation core (dedup, correlation, rule-based risk) | ✅ Done |
-| M4 — AI layer (LLM abstraction, evidence-first analysis, MITRE mapping) | ✅ Done |
-| M5 — Product (React dashboard, analyst feedback) | ✅ Done |
-| M6 — Hardening & proof (auth/RBAC, synthetic scenarios, deployment) | ✅ Done |
-
 ## Architecture (high level)
 
 ```
