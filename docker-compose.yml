@@ -1,0 +1,112 @@
+# DetectAI full-stack deployment.
+#
+# NOTE: written carefully but NOT executed in the environment that
+# produced it (no Docker daemon available there — see Dockerfiles for the
+# same caveat). Test this yourself before relying on it:
+#   cp .env.example .env   # edit SECRET_KEY at minimum
+#   docker compose up -d
+#   docker compose --profile ollama up -d   # to also start local Ollama
+#
+# Network segmentation note (architecture doc section 14): postgres and
+# redis are only reachable from containers on `backend-net`. The frontend
+# container is NOT attached to that network — it cannot reach the
+# database or cache at the container level, only the backend can. The
+# browser itself talks to the backend via its published host port, not
+# through the frontend container.
+#
+# Known gap: architecture doc section 25 lists an optional `worker`
+# service for background polling connectors. No such worker process
+# exists in the codebase yet (all connector polling is currently
+# triggered synchronously, not scheduled) — omitted here rather than
+# defining a service that would just fail to start. Add it once
+# workers/ actually has code in it.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: detectai
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-detectai}
+      POSTGRES_DB: detectai
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U detectai"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend-net
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend-net
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://detectai:${POSTGRES_PASSWORD:-detectai}@postgres:5432/detectai
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be set in .env — see .env.example}
+      AI_PROVIDER: ${AI_PROVIDER:-none}
+      AI_MODEL: ${AI_MODEL:-}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_BASE_URL: ${AI_BASE_URL:-}
+      ENVIRONMENT: production
+    ports:
+      - "8000:8000"
+    networks:
+      - backend-net
+    # Runs migrations before starting the server every time the container
+    # starts — safe because alembic upgrade is idempotent.
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: ${FRONTEND_API_BASE_URL:-http://localhost:8000/api/v1}
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "8080:8080"
+    # Deliberately no `networks:` entry — see network segmentation note above.
+
+  # Optional local LLM — start with: docker compose --profile ollama up -d
+  # Then set AI_PROVIDER=ollama, AI_BASE_URL=http://ollama:11434 in .env
+  # and restart the backend service.
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    profiles: ["ollama"]
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - backend-net
+
+volumes:
+  postgres_data:
+  ollama_data:
+
+networks:
+  backend-net:
